@@ -81,7 +81,7 @@
 // Some massaging of the data that I intended to have but didn't do because it didn't really make sense, like filling in empty
 // fields based on others if you didn't provide one, are on the TODO list and probably won't actually happen unless there's
 // some reason I need them.
-package main
+package main // import "github.com/nilium/resify"
 
 import (
 	"bytes"
@@ -103,7 +103,8 @@ import (
 	htmlt "html/template"
 	textt "text/template"
 
-	"gopkg.in/yaml.v2"
+	blackfriday "gopkg.in/russross/blackfriday.v2"
+	yaml "gopkg.in/yaml.v2"
 )
 
 const whitespace = "\r\n\t "
@@ -128,16 +129,17 @@ type Link struct {
 	Label string
 }
 
-func parseLink(p string) (link Link, err error) {
-	if !strings.HasPrefix(p, "((") || !strings.HasSuffix(p, "))") || len(p) <= 4 {
-		return Link{}, errNotALink
-	}
-	p = strings.Trim(p[2:len(p)-2], whitespace)
-	if len(p) == 0 {
+func parseLink(src string) (link Link, err error) {
+	if !strings.HasPrefix(src, "((") || !strings.HasSuffix(src, "))") || len(src) <= 4 {
 		return Link{}, errNotALink
 	}
 
-	components := strings.SplitN(p, " ", 2)
+	src = strings.Trim(src[2:len(src)-2], whitespace)
+	if len(src) == 0 {
+		return Link{}, errNotALink
+	}
+
+	components := strings.SplitN(src, " ", 2)
 	link.URL, err = url.Parse(strings.Trim(components[0], whitespace))
 	if err != nil {
 		log.Printf("error parsing link %q: %v", components[0], err)
@@ -150,10 +152,10 @@ func parseLink(p string) (link Link, err error) {
 
 	if len(link.Label) == 0 {
 		link.Label = link.URL.Host + link.URL.Path
-	}
 
-	if len(link.Label) == 0 {
-		link.Label = link.URL.String()
+		if len(link.Label) == 0 {
+			link.Label = link.URL.String()
+		}
 	}
 
 	return link, err
@@ -209,6 +211,8 @@ func linkify(s string) string {
 	return s
 }
 
+// readFile opens the file at path and returns its contents as a string. If any error occurs, that error is returned with an
+// empty string.
 func readFile(path string) (string, error) {
 	path = filepath.Clean(path)
 	if path == ".." || strings.HasPrefix(path, "../") {
@@ -404,13 +408,13 @@ func main() {
 	if useText {
 		tx, err := textt.New("root").
 			Funcs(map[string]interface{}{
-			"embed":   readFile,
-			"html":    nopstring,
-			"attr":    nopstring,
-			"css":     nopstring,
-			"js":      nopstring,
-			"linkify": linkify,
-		}).
+				"embed":   readFile,
+				"html":    nopstring,
+				"attr":    nopstring,
+				"css":     nopstring,
+				"js":      nopstring,
+				"linkify": linkify,
+			}).
 			ParseGlob(filepath.Join(dataDir, "*.tem"))
 
 		if err != nil {
@@ -423,13 +427,14 @@ func main() {
 	} else {
 		tx, err := htmlt.New("root").
 			Funcs(map[string]interface{}{
-			"embed":   readFile,
-			"html":    func(s string) htmlt.HTML { return htmlt.HTML(s) },
-			"attr":    func(s string) htmlt.HTMLAttr { return htmlt.HTMLAttr(s) },
-			"css":     func(s string) htmlt.CSS { return htmlt.CSS(s) },
-			"js":      func(s string) htmlt.JS { return htmlt.JS(s) },
-			"linkify": func(s string) htmlt.HTML { return htmlt.HTML(linkify(s)) },
-		}).
+				"embed":    readFile,
+				"html":     func(s string) htmlt.HTML { return htmlt.HTML(s) },
+				"attr":     func(s string) htmlt.HTMLAttr { return htmlt.HTMLAttr(s) },
+				"css":      func(s string) htmlt.CSS { return htmlt.CSS(s) },
+				"js":       func(s string) htmlt.JS { return htmlt.JS(s) },
+				"linkify":  func(s string) htmlt.HTML { return htmlt.HTML(linkify(s)) },
+				"markdown": func(s string) htmlt.HTML { return htmlt.HTML(blackfriday.Run([]byte(s))) },
+			}).
 			ParseGlob(filepath.Join(dataDir, "*.tem"))
 
 		if err != nil {

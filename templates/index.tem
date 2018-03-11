@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>{{ .Me.Chosen }}: Resume</title>
+</head>
+<body>
+    <h1>{{ .Me.Chosen }}</h1>
+    {{ if .Meta.statement -}}
+    <div>
+        {{ .Meta.statement | markdown }}
+    </div>
+    {{- end }}
+    <h2>Employment</h2>
+    <ul>
+        {{ range $e := .Employment -}}
+        <li>
+            <h3>{{ .Title }}</h3>
+            <p>{{ .Where.Name }} ({{ .Where.Place }})</p>
+            {{ .Description | markdown }}
+        </li>
+        {{- end }}
+    </ul>
+    <h2>Education</h2>
+    <ul>
+        {{ range $e := .Education -}}
+        <li>
+            <h3>{{ .Where.Name }} ({{ .Where.Place }})</h3>
+            <p>{{ .Where.Place }}</p>
+            <p><em>{{ or .Received "No degree" }}.</em></p>
+            {{ if .Fields }}
+            <p>Studied {{ range $nth, $f := .Fields }}{{ if gt $nth 0 }}, {{ end }}<em>{{ . }}</em>{{ end }}</p>
+            {{ end }}
+            {{ .Description | markdown }}
+        </li>
+        {{- end }}
+    </ul>
+</body>
+</html>
